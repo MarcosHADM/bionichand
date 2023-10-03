@@ -1,0 +1,41 @@
+#include <SPI.h>
+#include <Arduino.h>
+#include <Wire.h>
+#include <Adafruit_PWMServoDriver.h>
+
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
+
+#define SERVOMIN  200 // this is the 'minimum' pulse length count (out of 4096)
+#define SERVOMAX  600 // this is the 'maximum' pulse length count (out of 4096)
+
+void setup() {
+    Serial.begin(115200);
+    Serial.println("16 channel PWM test!");
+    pinMode(13, INPUT);
+    pwm.begin();
+    pwm.setPWMFreq(50); // This is the maximum PWM frequency
+}
+
+int angleToPulse(int ang){
+    int pulse = map(ang,0, 180, SERVOMIN,SERVOMAX);
+    Serial.print("Angle: ");
+    Serial.print(ang);
+    Serial.print(" pulse: ");
+    Serial.println(pulse);
+    return pulse;
+}
+
+void loop() {
+    for( int angle = 0; angle<181; angle+=10 ){
+        for(int i=0; i<16; i++) {      
+            pwm.setPWM(i, 0, angleToPulse(angle));
+        }
+    }
+    delay(100);
+    for( int angle = 180; angle>=0; angle-=10){
+        for(int i=0; i<16; i++) {      
+            pwm.setPWM(i, 0, angleToPulse(angle));
+        }
+    }
+    delay(100);
+}

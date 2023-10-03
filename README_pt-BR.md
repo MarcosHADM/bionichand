@@ -15,8 +15,8 @@
 
 [![Hackathon](https://img.shields.io/badge/hackathon-name-orange.svg?style=for-the-badge)](http://hackathon.url.com)
 [![Status](https://img.shields.io/badge/status-active-success.svg?style=for-the-badge)]()
-[![GitHub Issues](https://img.shields.io/github/issues/MarcosHADM/bionichand?style=for-the-badge)](https://github.com/MarcosHADM/bionichand/issues)
-[![GitHub pull requests](https://img.shields.io/github/issues-pr/MarcosHADM/bionichand?style=for-the-badge)](https://github.com/MarcosHADM/bionichand/pulls)
+[![GitHub Issues](https://img.shields.io/github/issues/MarcosHADM/HANDEASE?style=for-the-badge)](https://github.com/MarcosHADM/HANDEASE/issues)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/MarcosHADM/HANDEASE?style=for-the-badge)](https://github.com/MarcosHADM/HANDEASE/pulls)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge)](LICENSE.md)
 
 [![en](https://img.shields.io/badge/language-English-red?style=for-the-badge&)](README.md)
@@ -113,7 +113,7 @@ O projeto Braço Biônico utiliza as seguintes tecnologias e componentes:
 - [@Ruan Severo]()
 - [@Vinicius Rodrigues]()
 
-Veja também a lista de [contribuidores](https://github.com/MarcosHADM/bionichand/contributors) que participaram neste projeto.
+Veja também a lista de [contribuidores](https://github.com/MarcosHADM/HANDEASE/contributors) que participaram neste projeto.
 
 ## 🎉 Agradecimentos <a name = "acknowledgments"></a>
 O projeto Bionic Hand gostaria de agradecer o seguinte:

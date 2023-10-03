@@ -1,18 +1,38 @@
-#include <Arduino.h>
-#include <Logger.h>
+/**
+ * @file    main.cpp
+ * @brief   This is the main file of the project.
+ * @details It contains the implementation of the main functionality.
+ * 
+ * @author  Marcos Helbert
+ * @date    July, 2023
+ * @version 1.0
+ *
+ * @section LICENSE
+ *
+ * This program is proprietary software; all rights are reserved to the
+ * author, Marcos Helbert. Unauthorized copying or distribution of this
+ * program, or any portion of it, is strictly prohibited.
+ *
+ * For more information about licensing, please contact the author at
+ * marcoshhelbert@gmail.com.
+ */
+
+ #include <SPI.h>
+ #include <Arduino.h>
+ #include <Wire.h>
+ #include <Logger.h>
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
 #include <SPIFFS.h>
+ #include <Adafruit_PWMServoDriver.h>
 
-#define CONNECTION_TIMEOUT 10
+#include "config.cpp"
+#include "utils.cpp"
+
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 
 Logger logger(Debug, "{level} [{file}.{function}.{lineno}] {message}"); // Cria uma instância do logger com nível de log Info
-
-const char* ssid = "RESIDENCIA";
-const char* password = "mm251164";
-const char* ap_ssid = "Esp32_AP";
-const char* ap_password = "minhasenha123";
 
 IPAddress local_ip(192,168,1,1);
 IPAddress gateway(192,168,1,1);
@@ -40,16 +60,11 @@ String get_wifi_status(int status){
             return "STATUS_DESCONHECIDO";
     }
 }
-/*
-void handle_OnConnect() {
-    LED1status = LOW;
-    LED2status = LOW;
-    Serial.println("GPIO4 Status: OFF | GPIO5 Status: OFF");
-    server.send(200, "text/html", SendHTML(LOW, LOW)); 
-}
-*/
+
 void setup() {
     Serial.begin(115200);
+    pwm.begin();
+    pwm.setPWMFreq(50);
     delay(1000);
     Serial.println(" ");
     LOG(Info, "Iniciando o ESP32");
@@ -102,14 +117,23 @@ void setup() {
         request->send(SPIFFS, "/static/js/toggle-theme.js", "text/javascript");
     });
 
-    server.on("/logo.svg", HTTP_GET, [](AsyncWebServerRequest *request) {
-        request->send(SPIFFS, "/static/images/bionichand.svg", "image/svg+xml");
-    });
-
-
+    /*server.on("/logo.svg", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, "/static/images/HANDEASE.svg", "image/svg+xml");
+    });*/
 
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
         request->send(SPIFFS, "/index.html", "text/html");
+    });
+
+    server.on("/setservos", HTTP_POST, [](AsyncWebServerRequest *request){
+        for (int i = 0; i < 5; i++) {
+            int servoValue = request->arg("servo" + String(i)).toInt();
+            servoValue = map(servoValue, 0, 100, SERVOMIN, SERVOMAX);
+            Serial.println(servoValue);
+            pwm.setPWM(i, 0, servoValue);
+        };
+
+        request->send(200, "text/plain", "Servos atualizados");
     });
 
     server.on("/statistics", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -136,6 +160,8 @@ void setup() {
     server.on("/settings", HTTP_GET, [](AsyncWebServerRequest *request){
         request->send(SPIFFS, "/settings.html", "text/html");
     });
+
+
 
     server.begin();
     LOG(Info, "Servidor iniciado na porta 80");
