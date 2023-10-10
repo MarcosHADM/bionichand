@@ -1,3 +1,5 @@
+const wait = (delay = 0) => new Promise(resolve => setTimeout(resolve, delay));
+
 // MultiLang - BdR 2016
 // https://github.com/BdR76/MultiLanguage/
 var MultiLang = function(url, lang, onload) {
@@ -206,6 +208,71 @@ class SectionClass {
     }
 }
 
+class ModalClass {
+    constructor(modalAria, TitleText) {
+        this.modalAria = modalAria;
+        this.TitleText = TitleText;
+
+        this.modal = null;
+        this.background = null;
+
+        this.panelCenter = null;
+        this.panel = null;
+        this.container = null;
+        this.containerInner = null;
+        this.icon = null;
+        this.contentOuter = null;
+        this.title = null;
+        this.content = null;
+        this.buttons = null;
+    }
+    init() {
+        this.modal = $('<div>', {'class': 'relative z-10', 'role': 'dialog', 'aria-modal': 'true', 'aria-labelledby': this.modalAria, 'html': `<!--
+    Background backdrop, show/hide based on modal state.
+    
+    Entering: "ease-out duration-300"
+        From: "opacity-0"
+        To: "opacity-100"
+    Leaving: "ease-in duration-200"
+        From: "opacity-100"
+        To: "opacity-0"
+-->`
+        });
+
+        this.background = $('<div>', {'class': 'fixed inset-0 bg-gray-500 dark:bg-stone-800 bg-opacity-75 dark:bg-opacity-75'});
+        this.panelCenter = $('<div>', {'class':'fixed inset-0 z-10 w-screen overflow-y-auto'});
+        this.modal.append(this.background, this.panelCenter);
+
+        this.panel = $('<div>', {'class': 'flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0', 'html': `<!--
+    Modal panel, show/hide based on modal state.
+
+    Entering: "ease-out duration-300"
+        From: "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+        To: "opacity-100 translate-y-0 sm:scale-100"
+    Leaving: "ease-in duration-200"
+        From: "opacity-100 translate-y-0 sm:scale-100"
+        To: "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+-->`
+        });
+        this.panelCenter.append(this.panel);
+
+        this.container = $('<div>', {'class': 'relative transform overflow-hidden rounded-lg bg-gray-200 dark:bg-stone-950 text-left shadow-xl  transition-all sm:my-8 sm:w-full sm:max-w-lg'});
+        this.panel.append(this.container);
+
+        this.containerInner = $('<div>', {'class': 'px-4 pb-4 pt-5 sm:p-6 sm:pb-4'});
+        this.buttons = $('<div>', {'class': 'px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6'});
+        this.container.append(this.containerInner, this.buttons);
+
+        this.icon = $('<div>', {'class': 'mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full'});
+        this.contentOuter = $('<div>', {'class': 'mt-3 text-center '});
+        this.containerInner.append(this.icon, this.contentOuter);
+        
+        this.title = $('<h3>', {'class': 'text-base font-semibold leading-6', 'id': this.modalAria, 'html': this.TitleText, 'textcontent': this.TitleText});
+        this.content = $('<div>', {'class': 'mt-2'});
+        this.contentOuter.append(this.title, this.content);
+    }
+}
+
 function selectLanguageSection(main) {
     const TitleIcon = $('<svg class="h-auto w-32 text-blue-500 dark:text-blue-700" width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7.49996 1.80002C4.35194 1.80002 1.79996 4.352 1.79996 7.50002C1.79996 10.648 4.35194 13.2 7.49996 13.2C10.648 13.2 13.2 10.648 13.2 7.50002C13.2 4.352 10.648 1.80002 7.49996 1.80002ZM0.899963 7.50002C0.899963 3.85494 3.85488 0.900024 7.49996 0.900024C11.145 0.900024 14.1 3.85494 14.1 7.50002C14.1 11.1451 11.145 14.1 7.49996 14.1C3.85488 14.1 0.899963 11.1451 0.899963 7.50002Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M13.4999 7.89998H1.49994V7.09998H13.4999V7.89998Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M7.09991 13.5V1.5H7.89991V13.5H7.09991zM10.375 7.49998C10.375 5.32724 9.59364 3.17778 8.06183 1.75656L8.53793 1.24341C10.2396 2.82218 11.075 5.17273 11.075 7.49998 11.075 9.82724 10.2396 12.1778 8.53793 13.7566L8.06183 13.2434C9.59364 11.8222 10.375 9.67273 10.375 7.49998zM3.99969 7.5C3.99969 5.17611 4.80786 2.82678 6.45768 1.24719L6.94177 1.75281C5.4582 3.17323 4.69969 5.32389 4.69969 7.5 4.6997 9.67611 5.45822 11.8268 6.94179 13.2472L6.45769 13.7528C4.80788 12.1732 3.9997 9.8239 3.99969 7.5z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path><path d="M7.49996 3.95801C9.66928 3.95801 11.8753 4.35915 13.3706 5.19448 13.5394 5.28875 13.5998 5.50197 13.5055 5.67073 13.4113 5.83948 13.198 5.89987 13.0293 5.8056 11.6794 5.05155 9.60799 4.65801 7.49996 4.65801 5.39192 4.65801 3.32052 5.05155 1.97064 5.8056 1.80188 5.89987 1.58866 5.83948 1.49439 5.67073 1.40013 5.50197 1.46051 5.28875 1.62927 5.19448 3.12466 4.35915 5.33063 3.95801 7.49996 3.95801zM7.49996 10.85C9.66928 10.85 11.8753 10.4488 13.3706 9.6135 13.5394 9.51924 13.5998 9.30601 13.5055 9.13726 13.4113 8.9685 13.198 8.90812 13.0293 9.00238 11.6794 9.75643 9.60799 10.15 7.49996 10.15 5.39192 10.15 3.32052 9.75643 1.97064 9.00239 1.80188 8.90812 1.58866 8.9685 1.49439 9.13726 1.40013 9.30601 1.46051 9.51924 1.62927 9.6135 3.12466 10.4488 5.33063 10.85 7.49996 10.85z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>');
     const TitleText = '';
@@ -273,14 +340,203 @@ function setupNetworkSection(main) {
 }
 
 let isRequestingNetworks = false;
+let isTryingToConnect = false;
 function updateWifi(networksDiv) {
-    if (isRequestingNetworks) {
-        return;
-    }
-
+    if (isRequestingNetworks) return;
     isRequestingNetworks = true;
 
-    const networks = $('<div>', {'class': 'h-full w-full overflow-y-auto', 'style': 'display: none;'});
+    const createNetworkButton = (network) => {
+        const isSecure = network.secure !== 0;
+        const isHighQuality = network.quality >= 66;
+        const isMediumQuality = network.quality >= 33;
+
+        const networkButton = $('<button>', {'type': 'button','class': 'my-1 relative border border-gray-600 w-full px-2 py-2 text-lg font-medium text-stone-900 dark:text-white rounded-lg hover:bg-bluey-500 dark:hover:bg-bluey-700 hover:text-white focus:z-10 focus:ring-5 focus:ring-blue-700',});
+        const networkButtonDiv = $('<div>', {'class': 'inline-flex items-start w-full'});
+        networkButton.append(networkButtonDiv);
+
+        const networkButtonDivText = $('<div>', {'class': 'w-full text-ellipsis overflow-hidden whitespace-nowrap text-left'});
+        const networkButtonDivTextSSID = $('<p>', {'html': network.ssid, 'class': 'text-ellipsis overflow-hidden whitespace-nowrap'});
+        const networkButtonDivTextConnected = $('<p>', {'html': 'Connected', 'textcontent': 'Connected', 'class': 'font-light text-xs', 'style': network.connected ? '' : 'display: none;'})
+        networkButtonDiv.append(networkButtonDivText.append(networkButtonDivTextSSID, networkButtonDivTextConnected));
+
+        const networkButtonDivIcons = $('<div>', {'class': 'ml-auto flex items-center mt-2'});
+        networkButtonDivIcons.append(isSecure ? '<svg class="w-4 h-4 mr-2" width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 4.63601C5 3.76031 5.24219 3.1054 5.64323 2.67357C6.03934 2.24705 6.64582 1.9783 7.5014 1.9783C8.35745 1.9783 8.96306 2.24652 9.35823 2.67208C9.75838 3.10299 10 3.75708 10 4.63325V5.99999H5V4.63601ZM4 5.99999V4.63601C4 3.58148 4.29339 2.65754 4.91049 1.99307C5.53252 1.32329 6.42675 0.978302 7.5014 0.978302C8.57583 0.978302 9.46952 1.32233 10.091 1.99162C10.7076 2.65557 11 3.57896 11 4.63325V5.99999H12C12.5523 5.99999 13 6.44771 13 6.99999V13C13 13.5523 12.5523 14 12 14H3C2.44772 14 2 13.5523 2 13V6.99999C2 6.44771 2.44772 5.99999 3 5.99999H4ZM3 6.99999H12V13H3V6.99999Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>' : '');
+        networkButtonDivIcons.append(`<svg class="w-4 h-4" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 12 12" style="enable-background:new 0 0 12 12;" xml:space="preserve">${isHighQuality ? '<path fill="currentColor" d="M1,5C1.3,5.3,1.7,5.3,2,5.1c2.3-1.9,5.7-1.9,8.1,0c0.3,0.2,0.7,0.2,0.9,0c0.3-0.3,0.3-0.8-0.1-1c-2.9-2.3-7-2.3-9.8,0 C0.8,4.2,0.7,4.7,1,5z"/>' : ''}${isMediumQuality ? '<path fill="currentColor" d="M3,7C3.3,7.3,3.7,7.3,4,7.1c1.2-0.9,2.9-0.9,4.1,0C8.3,7.3,8.7,7.3,9,7l0,0C9.3,6.7,9.2,6.2,8.9,6C7.2,4.7,4.8,4.7,3.1,6 C2.8,6.2,2.7,6.7,3,7z"/>' : ''}<path fill="currentColor" d="M4.9,8.9l0.7,0.7c0.2,0.2,0.5,0.2,0.7,0l0.7-0.7C7.3,8.7,7.3,8.3,7,8.1c-0.6-0.3-1.3-0.3-2,0C4.7,8.3,4.7,8.7,4.9,8.9z"/></svg>`);
+        networkButtonDiv.append(networkButtonDivIcons)
+
+        networks.append(networkButton);
+
+        networkButton.click(function () {
+            const modal = new ModalClass('wifi-connect', 'Connect to the network "' + network.ssid + '"');
+            modal.init();
+            
+            modal.icon[0].className += ' bg-bluey-500 dark:bg-bluey-700';
+            modal.icon.append($('<svg class="h-6 w-6 text-gray-200 dark:text-stone-950" xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36"><path fill="currentColor" d="M12 6a6.21 6.21 0 0 0-6.21 5H2v2h3.83A6.23 6.23 0 0 0 12 18h5V6Z" class="clr-i-solid clr-i-solid-path-1"/><path fill="currentColor" d="M33.79 23h-3.65a6.25 6.25 0 0 0-6.21-5H19v2h-5a1 1 0 0 0-1 1a1 1 0 0 0 1 1h5v4h-5a1 1 0 0 0-1 1a1 1 0 0 0 1 1h5v2h4.94a6.23 6.23 0 0 0 6.22-5h3.64Z" class="clr-i-solid clr-i-solid-path-2"/><path fill="none" d="M0 0h36v36H0z"/></svg>'))
+            
+            const modalTitle = $('<div>', {'class': 'flex justify-center',}).append(
+                $('<h3>', {'class': 'text-base font-semibold leading-6', 'html': 'Connect to the network "', 'textcontent': 'Connect to the network'}),
+                $('<h3>', {'class': 'text-base font-semibold leading-6', 'html': network.ssid}),
+                $('<h3>', {'class': 'text-base font-semibold leading-6', 'html': '"'})
+            );
+            modal.title.replaceWith(modalTitle);
+
+            const password = {
+                div: $('<div>', {'class': 'mt-2'}),
+                label: $('<label>', {'class': 'text-left block mb-1 text-sm font-medium text-gray-900 dark:text-white', 'for': 'password', 'html': 'Enter network security key', 'textcontent': 'Enter network security key'}),
+                input: $('<input>', {'type': 'password', 'name': 'password', 'placeholder': '••••••••', 'class': 'bg-gray-200 dark:bg-stone-900 border border-gray-300 text-gray-900 sm:text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500'}),
+                minChars: $('<p>', {'html': 'Password must be at least 8 characters long', 'textcontent': 'Password must be at least 8 characters long', 'class': 'text-sm text-red-500 font-semibold', 'style': 'visibility: hidden;'}),
+                error: $('<p>', {'html': 'Error connecting to the network', 'textcontent': 'Error connecting to the network', 'class': 'text-sm text-red-500 font-semibold', 'style': 'visibility: hidden;'})
+            }
+            password.div.append(password.label, password.input, password.minChars, password.error);
+            if (isSecure) modal.content.append(password.div);
+
+            const connectButton = $('<button>', {
+                'type': 'button',
+                'class': 'connect inline-flex w-full justify-center rounded-md bg-bluey-500 dark:bg-bluey-700 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-bluey-600 hover:dark:bg-bluey-600 sm:ml-3 sm:w-auto',
+                'html': 'Connect',
+                'textcontent': 'Connect'
+            });
+            const cancelButton = $('<button>', {
+                'type': 'button', 
+                'class': 'cancel mt-3 inline-flex w-full justify-center rounded-md bg-gray-200 dark:bg-stone-950 hover:bg-gray-300 hover:dark:bg-stone-900 px-3 py-2 text-sm font-semibold shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto',
+                'html': 'Cancel',
+                'textcontent': 'Cancel'
+            });
+            modal.buttons.append(connectButton, cancelButton);
+
+            networksDiv.append(modal.modal);
+            modal.modal.fadeIn("fast");
+            
+            cancelButton.click(function () {
+                if (isTryingToConnect) return;
+                modal.modal.fadeOut("fast", () => {
+                    modal.modal.remove();
+                });
+            });
+            modal.modal.on('mousedown', function (e) {
+                if (isTryingToConnect) return;
+                if (!modal.container.is(e.target) && modal.container.has(e.target).length === 0) {
+                    modal.modal.fadeOut("fast", () => {modal.modal.remove();})
+                };
+            });
+            modal.modal.on('keydown', function (e) {if (e.key === 'Escape' || e.keyCode === 27) modal.modal.mousedown();});
+            password.input.on('keydown', function (e) {if (e.key === 'Enter' || e.keyCode === 13) connectButton.click();});
+
+            connectButton.click(function () {
+                if (isTryingToConnect) return;
+                password.minChars.css('visibility', 'hidden');
+                password.error.css('visibility', 'hidden');
+
+                if (isSecure) {
+                    if (password.input.val().length < 8) {
+                        password.error.before(password.minChars);
+                        password.minChars.css('visibility', 'visible');
+                        password.input.focus().keydown(function() {
+                            if (password.input.val().length >= 7) {
+                                password.minChars.css('visibility', 'hidden');
+                            }
+                        });
+                        return;
+                    }
+                } else password.input.val("");
+
+                password.minChars.before(password.error);
+
+                isTryingToConnect = true;
+                modal.containerInner.css('filter', 'blur(2px)');
+                modal.buttons.css('filter', 'blur(2px)');
+
+                const loadingContainter = $('<div>', {'class': 'fixed h-full w-full top-0 flex justify-center items-center'});
+                loadingContainter.css('filter', 'blur(-2px)');
+                loadingContainter.append($('<svg class="animate-spin h-12 w-12 text-bluey-500 dark:text-bluey-700 z-20" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>'))
+                modal.container.append(loadingContainter);
+
+                $.ajax({
+                    type: "POST",
+                    url: "http://handmotion.local/wifi/connect",
+                    contentType: "application/json",
+                    data: JSON.stringify({type: "check", ssid: network.ssid, password: password.input.val()}),
+                    success: function (response) {
+                        wait(15000).then(() => {
+                            $.ajax({
+                                type: "POST",
+                                url: "http://handmotion.local/wifi/connect",
+                                contentType: "application/json",
+                                data: JSON.stringify({type: "response", ssid: network.ssid, password: password.input.val()}),
+                                success: function (response) {
+                                    const connectedModal = new ModalClass('wifi-result', 'Successfully connected');
+                                    connectedModal.init();
+
+                                    connectedModal.icon[0].className += ' p-2 bg-green-100 text-green-600';
+                                    connectedModal.icon.append($('<svg class="" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" class="oc se axy"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"></path></svg>'))
+                                    connectedModal.content.append($('<p>', {
+                                        'class': 'text-md',
+                                        'html': 'You are now connected to the internet network; we will redirect you to the page where you can control your <strong>handmotion</strong> device.',
+                                        'textcontent': 'You are now connected to the internet network; we will redirect you to the page where you can control your handmotion device.'
+                                    }));
+
+                                    const okButton = $('<button>', {
+                                        'type': 'button',
+                                        'class': 'inline-flex w-full justify-center rounded-md bg-bluey-500 dark:bg-bluey-700 px-3 py-2 text-md font-semibold text-white shadow-sm hover:bg-bluey-600 hover:dark:bg-bluey-600',
+                                        'html': 'Ok',
+                                        'textcontent': 'Ok'
+                                    });
+                                    connectedModal.buttons.append(okButton);
+                                    modal.modal.fadeOut("fast", () => {
+                                        networksDiv.append(connectedModal.modal);
+                                        connectedModal.modal.fadeIn("fast");
+                                        modal.modal.remove();
+                                    });
+                                },
+                                error: function (error) {
+                                    password.error.css('visibility', 'visible');
+                                },
+                            });
+                            isTryingToConnect = false;
+                            modal.containerInner.css('filter', 'blur(0px)');
+                            modal.buttons.css('filter', 'blur(0px)');
+                            loadingContainter.remove();
+                        });
+                    },
+                    error: function (error) {
+                        isTryingToConnect = false;
+                        modal.containerInner.css('filter', 'blur(0px)');
+                        modal.buttons.css('filter', 'blur(0px)');
+                        loadingContainter.remove();
+                        password.error.css('visibility', 'visible');
+                    },
+                })
+            });
+
+
+            /*
+            modalButtons.find('.connect').click(function() {
+                console.log('Connecting to network...');
+                $.ajax({
+                    type: "POST", url: "http://handmotion.local/wifi/connect", contentType: "application/json",
+                    data: JSON.stringify({type: "check", ssid: network.ssid, password: password.find('input').val()}),
+                    success: function (response) {
+                        wait(15000).then(() => {
+                            $.ajax({
+                                type: "POST", url: "http://handmotion.local/wifi/connect", contentType: "application/json",
+                                data: JSON.stringify({type: "response", ssid: network.ssid, password: password.find('input').val()}),
+                                success: function (response) {
+                                    
+                                },
+                                error: function (error) {
+                                    console.log(error);
+                                },
+                            })
+                        });
+                    },
+                    error: function (error) {
+                        console.log(error);
+                    }
+                });
+            });*/
+        });
+    }
+
     const searchingNetworks = $('<p>', {
         'class': 'font-bold text-xl text-center text-gray-400 dark:text-stone-700 mb-20',
         'html': 'Searching for WiFi networks...',
@@ -291,6 +547,7 @@ function updateWifi(networksDiv) {
         'html': 'No networks found.',
         'textcontent': 'No networks found.',
     });
+    const networks = $('<div>', {'class': 'h-full w-full overflow-y-auto', 'style': 'display: none;'});
 
     networks.fadeOut('fast');
     noNetworks.fadeOut('fast');
@@ -300,193 +557,48 @@ function updateWifi(networksDiv) {
 
     $.ajax({
         type: 'GET',
-        url: 'http://192.168.4.1/wifi/scan',
+        url: 'http://handmotion.local/wifi/scan',
         crossDomain: true,
         dataType: 'json',
         success: function (response) {
-            if ($.isEmptyObject(response)) {
-                searchingNetworks.fadeOut('fast', () => {
-                    searchingNetworks.remove();
+            searchingNetworks.fadeOut('fast', () => {
+                searchingNetworks.remove();
+
+                if ($.isEmptyObject(response)) {
                     networksDiv.append(noNetworks);
                     noNetworks.fadeIn("fast");
-                    isRequestingNetworks = false;
-                });
-            } else {
-                const json = response.networks;
-                const connectedNetwork = json.find(network => network.connected);
-                json.sort((a, b) => b.rssi - a.rssi);
+                } else {
+                    const json = response.networks;
+                    const connectedNetwork = json.find(network => network.connected);
+                    json.sort((a,b) => b.rssi - a.rssi);
 
-                if (connectedNetwork) {
-                    const index = json.indexOf(connectedNetwork);
-                    if (index !== -1) {
-                        json.splice(index, 1);
-                        json.unshift(connectedNetwork);
+                    if (connectedNetwork) {
+                        const index = json.indexOf(connectedNetwork);
+                        if (index !== -1) {
+                            json.splice(index, 1);
+                            json.unshift(connectedNetwork);
+                        }
                     }
-                }
 
-                json.forEach(network => {
-                    if (network.ssid == null) return;
-                    const isSecure = network.secure !== 0;
-                    const isHighQuality = network.quality >= 66;
-                    const isMediumQuality = network.quality >= 33;
-
-                    const networkButton = $('<button>', {'type': 'button','class': 'my-1 relative border border-gray-600 w-full px-2 py-2 text-lg font-medium text-stone-900 dark:text-white rounded-lg hover:bg-bluey-500 dark:hover:bg-bluey-700 hover:text-white focus:z-10 focus:ring-5 focus:ring-blue-700',});
-                    const networkButtonDiv = $('<div>', {'class': 'inline-flex items-start w-full'});
-                    networkButton.append(networkButtonDiv);
-                    const networkButtonDivText = $('<div>', {'class': 'w-full text-ellipsis overflow-hidden whitespace-nowrap text-left'});
-                    const networkButtonDivTextSSID = $('<p>', {'html': network.ssid, 'class': 'text-ellipsis overflow-hidden whitespace-nowrap'});
-                    const networkButtonDivTextConnected = $('<p>', {'html': 'Connected', 'textcontent': 'Connected', 'class': 'font-light text-xs', 'style': network.connected ? '' : 'display: none;'})
-                    networkButtonDiv.append(networkButtonDivText.append(networkButtonDivTextSSID, networkButtonDivTextConnected));
-
-                    const networkButtonDivIcons = $('<div>', {'class': 'ml-auto flex items-center mt-2'});
-                    networkButtonDivIcons.append(isSecure ? '<svg class="w-4 h-4 mr-2" width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 4.63601C5 3.76031 5.24219 3.1054 5.64323 2.67357C6.03934 2.24705 6.64582 1.9783 7.5014 1.9783C8.35745 1.9783 8.96306 2.24652 9.35823 2.67208C9.75838 3.10299 10 3.75708 10 4.63325V5.99999H5V4.63601ZM4 5.99999V4.63601C4 3.58148 4.29339 2.65754 4.91049 1.99307C5.53252 1.32329 6.42675 0.978302 7.5014 0.978302C8.57583 0.978302 9.46952 1.32233 10.091 1.99162C10.7076 2.65557 11 3.57896 11 4.63325V5.99999H12C12.5523 5.99999 13 6.44771 13 6.99999V13C13 13.5523 12.5523 14 12 14H3C2.44772 14 2 13.5523 2 13V6.99999C2 6.44771 2.44772 5.99999 3 5.99999H4ZM3 6.99999H12V13H3V6.99999Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>' : '');
-                    networkButtonDivIcons.append(`<svg class="w-4 h-4" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 12 12" style="enable-background:new 0 0 12 12;" xml:space="preserve">${isHighQuality ? '<path fill="currentColor" d="M1,5C1.3,5.3,1.7,5.3,2,5.1c2.3-1.9,5.7-1.9,8.1,0c0.3,0.2,0.7,0.2,0.9,0c0.3-0.3,0.3-0.8-0.1-1c-2.9-2.3-7-2.3-9.8,0 C0.8,4.2,0.7,4.7,1,5z"/>' : ''}${isMediumQuality ? '<path fill="currentColor" d="M3,7C3.3,7.3,3.7,7.3,4,7.1c1.2-0.9,2.9-0.9,4.1,0C8.3,7.3,8.7,7.3,9,7l0,0C9.3,6.7,9.2,6.2,8.9,6C7.2,4.7,4.8,4.7,3.1,6 C2.8,6.2,2.7,6.7,3,7z"/>' : ''}<path fill="currentColor" d="M4.9,8.9l0.7,0.7c0.2,0.2,0.5,0.2,0.7,0l0.7-0.7C7.3,8.7,7.3,8.3,7,8.1c-0.6-0.3-1.3-0.3-2,0C4.7,8.3,4.7,8.7,4.9,8.9z"/></svg>`);
-                    networkButtonDiv.append(networkButtonDivIcons);
-
-                    networks.append(networkButton);
-
-                    networkButton.click(function () {
-                        const modal = $('<div>', {'class': 'relative z-10'})
-                        const modalBackground = $('<div>', {'class': 'fixed inset-0 bg-gray-500 dark:bg-stone-800 bg-opacity-75 transition-opacity'});
-                        modal.append(modalBackground);
-
-                        const modalContent = $('<div>', {'class': 'fixed inset-0 z-10 w-screen overflow-y-auto'});
-                        const modalContentDiv = $('<div>', {'class': 'flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0'});
-                        const modalContainer = $('<div>', {'class': 'container relative transform overflow-hidden rounded-lg bg-gray-200 dark:bg-stone-950 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg'});
-                        modal.append(modalContent.append(modalContentDiv.append(modalContainer)));
-
-                        const modalContainerInner = $('<div>', {'class': 'px-4 pb-4 pt-5 sm:p-6 sm:pb-4'});
-                        const modalContainerInnerInner = $('<div>', {'class': 'sm:flex sm:items-start'});
-                        const modalRealContent = $('<div>', {'class': 'mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full'});
-                        
-                        modalContainer.append(modalContainerInner.append(modalContainerInnerInner.append(modalRealContent)));
-                        
-                        const modalIcon = $('<div>', {
-                            'class': 'mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-bluey-500  sm:mx-0 sm:h-10 sm:w-10',
-                            'html': '<svg class="h-6 w-6 text-gray-200 dark:text-stone-950" xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36"><path fill="currentColor" d="M12 6a6.21 6.21 0 0 0-6.21 5H2v2h3.83A6.23 6.23 0 0 0 12 18h5V6Z" class="clr-i-solid clr-i-solid-path-1"/><path fill="currentColor" d="M33.79 23h-3.65a6.25 6.25 0 0 0-6.21-5H19v2h-5a1 1 0 0 0-1 1a1 1 0 0 0 1 1h5v4h-5a1 1 0 0 0-1 1a1 1 0 0 0 1 1h5v2h4.94a6.23 6.23 0 0 0 6.22-5h3.64Z" class="clr-i-solid clr-i-solid-path-2"/><path fill="none" d="M0 0h36v36H0z"/></svg>'
-                        });
-                        modalContainerInnerInner.append(modalIcon);
-
-                        const modalTitle = $('<div>', {'class': 'flex',});
-                        modalTitle.append($('<h3>', {'class': 'text-base font-semibold leading-6', 'html': 'Connect to the network "', 'textcontent': 'Connect to the network "'}));
-                        modalTitle.append($('<h3>', {'class': 'text-base font-semibold leading-6', 'html': network.ssid}));
-                        modalTitle.append($('<h3>', {'class': 'text-base font-semibold leading-6', 'html': '"'}));
-                        modalRealContent.append(modalTitle);
-
-                        const passwordDiv = $('<div>', {'class': 'mt-2'});
-                        const passwordLabel = $('<label>', {
-                            'class': 'block mb-1 text-sm font-medium text-gray-900 dark:text-white',
-                            'for': 'password',
-                            'html': 'Enter network security key',
-                            'textcontent': 'Enter network security key'
-                        });
-                        const password = $('<input>', {
-                            'type': 'password',
-                            'name': 'password',
-                            'placeholder': '••••••••',
-                            'class': 'bg-gray-200 dark:bg-stone-900 border border-gray-300 text-gray-900 sm:text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500',
-                            'required': true,
-                        });
-                        const eigthChars = $('<p>', {
-                            'html': 'Password must be at least 8 characters long',
-                            'textcontent': 'Password must be at least 8 characters long',
-                            'class': 'text-sm text-red-500 font-semibold',
-                            'style': 'visibility: hidden;'
-                        });
-                        const wrongPassword = $('<p>', {
-                            'html': 'Error connecting to the network',
-                            'textcontent': 'Error connecting to the network',
-                            'class': 'text-sm text-red-500 font-semibold',
-                            'style': 'visibility: hidden;'
-                        });
-                        passwordDiv.append(passwordLabel, password, eigthChars, wrongPassword);
-                        if (isSecure) modalRealContent.append(passwordDiv);
-                        
-                        const modalButtons = $('<div>', {'class': 'px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6'});
-                        const modalConnectButton = $('<button>', {
-                            'type': 'button',
-                            'class': 'inline-flex w-full justify-center rounded-md bg-bluey-500 dark:bg-bluey-700 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-bluey-600 hover:dark:bg-bluey-600 sm:ml-3 sm:w-auto',
-                            'html': 'Connect',
-                            'textcontent': 'Connect',
-                        });
-                        const modalCancelButton = $('<button>', {
-                            'type': 'button',
-                            'class': 'mt-3 inline-flex w-full justify-center rounded-md bg-gray-200 dark:bg-stone-950 hover:bg-gray-300 hover:dark:bg-stone-900 px-3 py-2 text-sm font-semibold shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto',
-                            'html': 'Cancel',
-                            'textcontent': 'Cancel',
-                        });
-                        modalContainer.append(modalButtons.append(modalConnectButton, modalCancelButton));
-
-                        networksDiv.append(modal);
-                        modal.fadeIn('fast');
-
-                        modal.click(function (e) {
-                            if (!modalContainer.is(e.target) && modalContainer.has(e.target).length === 0) {
-                                modal.fadeOut("fast", () => {
-                                    modal.remove();
-                                });
-                            }
-                        });
-
-                        modalCancelButton.click(function () {
-                            modal.fadeOut("fast", () => {
-                                modal.remove();
-                            });
-                        });
-
-                        modalConnectButton.click(function() {
-                            if (isSecure) {
-                                if (password.val().length < 8) {
-                                    eigthChars.css('visibility', 'visible');
-                                    password.focus().keydown(function() {
-                                        if (password.val().length >= 7) {
-                                            eigthChars.css('visibility', 'hidden');
-                                        }
-                                    });
-                                    return;
-                                }
-                            } else {
-                                password.val("");
-                            }
-
-                            console.log('Connecting to network...');
-                            $.ajax({
-                                type: "POST",
-                                url: "/wifi/connect",
-                                contentType: "application/json",
-                                data: JSON.stringify({
-                                    ssid: network.ssid,
-                                    password: password.val()
-                                }),
-                                success: function (response) {
-                                    console.log(response);
-                                },
-                                error: function (error) {
-                                    console.log(error);
-                                }
-                            });
-                        });
+                    json.forEach(network => {
+                        if (network.ssid == null) return;
+                        const networkButton = createNetworkButton(network);
                     });
-                });
 
-                searchingNetworks.fadeOut("fast", () => {
-                    searchingNetworks.remove();
                     networksDiv.append(networks);
                     networks.fadeIn("fast");
-                    isRequestingNetworks = false;
-                });
-            }
-            
-            networksDiv.append()
+                }
 
+                isRequestingNetworks = false;
+            });
         },
         error: function (error) {
             searchingNetworks.fadeOut('fast', () => {
                 searchingNetworks.remove();
                 networksDiv.append(noNetworks);
-                noNetworks.fadeIn('fast');
+                noNetworks.fadeIn("fast");
                 isRequestingNetworks = false;
-            })
+            });
         }
     });
 
@@ -618,8 +730,6 @@ function setupApSection(main) {
 
 $(document).ready(function() {
     multilang = new MultiLang('languages.json', 'null', this.initList);
-
-    const wait = (delay = 0) => new Promise(resolve => setTimeout(resolve, delay));
 
     const body = $('body');
     body.addClass("h-screen bg-gray-200 dark:bg-stone-950");

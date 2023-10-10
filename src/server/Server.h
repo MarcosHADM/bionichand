@@ -30,8 +30,8 @@ class Server_Class {
 
         AsyncCallbackJsonWebHandler* wificonnecthandle = new AsyncCallbackJsonWebHandler("/wifi/connect", [](AsyncWebServerRequest *request, JsonVariant &json) {
             JsonObject jsonObj = json.as<JsonObject>();
-            if (jsonObj["ssid"].isNull() || jsonObj["ssid"].as<String>().length() < 1 || jsonObj["ssid"].as<String>().length() > 32
-            ) {
+
+            if (jsonObj["ssid"].isNull() || jsonObj["ssid"].as<String>().length() < 1 || jsonObj["ssid"].as<String>().length() > 32) {
                 request->send(400, "text/plain", "Bad Request");
                 return;
             }
@@ -44,28 +44,20 @@ class Server_Class {
                 }
             }
 
-            Serial.println(jsonObj["ssid"].as<String>());
-            Serial.println(jsonObj["password"].as<String>());
+            if (jsonObj["type"].as<String>() == "check") {
+                Wifi.checkConnect(jsonObj["ssid"].as<String>(), jsonObj["password"].as<String>());
 
-            Wifi.disconnect();
-            Wifi.connect(jsonObj["ssid"].as<String>().c_str(), jsonObj["password"].as<String>().c_str());
-            Serial.println("Connecting to WiFi...");
-            unsigned long startMillis = esp_timer_get_time()/1000;
-            Serial.print("Connecting");
-            while ((WiFi.status() || WiFi.status() >= WL_DISCONNECTED) && (esp_timer_get_time()/1000 - startMillis) < CONNECTION_TIMEOUT * 1000) {
-                Serial.print(".");
-                rtc_wdt_feed();
-                //delay(100);
-            }
-            Serial.println();
-
-            if (WiFi.status() == WL_CONNECTED) {
-                Serial.println("Connected to WiFi");
                 request->send(200, "text/plain", "OK");
-            } else {
-                Serial.println("Failed to connect to WiFi");
-                request->send(401, "text/plain", "WiFi Password Incorrect");
             }
+            else if (jsonObj["type"].as<String>() == "response") {
+                bool result = Wifi.resultCheckConnect(jsonObj["ssid"].as<String>(), jsonObj["password"].as<String>());
+                if (result) {
+                    request->send(200, "text/plain", "OK");
+                } else {
+                    request->send(401, "text/plain", "WiFi Connect Failed");
+                }
+            }
+            
         });
 
         static void index(AsyncWebServerRequest *request, byte isFirstStart) {

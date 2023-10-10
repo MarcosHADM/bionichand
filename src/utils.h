@@ -101,4 +101,11 @@ static const char* wl_status_to_string(uint8_t status) {
     }
 }
 
+
+struct WiFiCredentials {
+    String ssid;
+    String password;
+    String response;
+};
+
 #endif  // UTILS_H

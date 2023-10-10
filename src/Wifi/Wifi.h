@@ -10,12 +10,36 @@
 #include "utils.h"
 #include "Spiffs/Spiffs.h"
 
+static WiFiCredentials checkConnectResult;
+
+static void CheckConnectAsync(void* parameters) {
+    if (checkConnectResult.ssid == "" || checkConnectResult.ssid == NULL || checkConnectResult.password == "" || checkConnectResult.password == NULL) {
+        vTaskDelete(NULL);
+    } else {
+        WiFi.disconnect();
+        WiFi.begin(checkConnectResult.ssid.c_str(), checkConnectResult.password.c_str());
+        WiFi.waitForConnectResult(CONNECTION_TIMEOUT * 1000000);
+
+        Serial.println("WiFi status: " + get_wifi_status(WiFi.status()));
+        if (WiFi.status() == WL_CONNECTED) {
+            WiFi.disconnect();
+            checkConnectResult.response = "SUCCESS";
+        } else {
+            WiFi.disconnect();
+            checkConnectResult.response = "ERROR";
+        }
+    }
+
+    vTaskDelete(NULL);
+}
+
 class WiFi_Class {
     private:
         IPAddress localIP; 
         IPAddress localGateway;
         //IPAddress subnet(255, 255, 0, 0);
         unsigned long previousMillis = 0;
+
     public:
         WiFi_Class() {};
 
@@ -41,37 +65,27 @@ class WiFi_Class {
         }
 
         uint8_t status() {
-            
             return WiFi.status();
         };
 
-        bool checkConnect(const char *ssid, const char *password) {
-            WiFi.disconnect();
-
-            WiFi.begin(ssid, password);
-            Serial.println("Connecting to WiFi...");
-            //uint8_t result = WiFi.waitForConnectResult(CONNECTION_TIMEOUT * 1000000);
-            //Serial.println(wl_status_to_string(result));
-
-            unsigned long startMillis = esp_timer_get_time()/1000;
-            Serial.print("Connecting");
-            while ((WiFi.status() || WiFi.status() >= WL_DISCONNECTED) && (esp_timer_get_time()/1000 - startMillis) < CONNECTION_TIMEOUT * 1000) {
-                Serial.print(".");
-                rtc_wdt_feed();
-                delay(100);
+        bool resultCheckConnect(String ssid, String password) {
+            if (checkConnectResult.ssid == ssid && checkConnectResult.password == password) {
+                if (checkConnectResult.response == "SUCCESS") {
+                    return true;
+                } else {
+                    return false;
+                }
             }
-            Serial.println();
-
-            if (WiFi.status() == WL_CONNECTED) {
-                WiFi.disconnect();
-                Serial.println("Connected to the WiFi network");
-                return true;
-            } else {
-                WiFi.disconnect();
-                Serial.println("Failed to connect.");
-                return false;
-            }
-        }
+            return false;
+        };
+        
+        void checkConnect(String ssid, String password) {
+            checkConnectResult.ssid = ssid;
+            checkConnectResult.password = password;
+            checkConnectResult.response = "CHECKING";
+            
+            xTaskCreatePinnedToCore(CheckConnectAsync, "checkConnect", 4096, NULL, 1, NULL, 0);
+        };
 
         bool scan(JsonVariant& jsonObj) {
             int n = WiFi.scanComplete();
