@@ -1,12 +1,11 @@
 <!DOCTYPE html>
-<!DOCTYPE html>
 <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>handmotion</title>
-
-        <script type="text/javascript" src="jquery-3.7.0.min.js"></script>
+        <link rel="icon" href="/favicon.svg" sizes="any" type="image/svg+xml">
+        <script type="text/javascript" src="jquery.min.js"></script>
         <script type="text/javascript" src="tailwind.js"></script>
         <script type="text/javascript" src="tailwind.config.js"></script>
     </head>
@@ -20,9 +19,72 @@
         *::-webkit-scrollbar {width: 8px;}
         *::-webkit-scrollbar-thumb {background-color: #888; border-radius: 4px;}
         *::-webkit-scrollbar-track {background-color: transparent;}
+        
+        .light {
+            --background-slider: #e2e8f0;
+            --box-shadow-slider: #94a3b8;
+        }
+        .dark {
+            --background-slider: #020617;
+            --box-shadow-slider: #1f2937;
+        }
+        
+        input[type="range"] {
+            height: 1.5rem;
+            width: 100%;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            overflow: hidden;
+            background-color: transparent;
+            border-radius: 1rem;
+        }
+        input[type="range"]:focus {
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 0.5rem;
+            width: 100%;
+            background-color: var(--background-slider);
+            border-radius: 1rem;
+        }
+        input[type="range"]::-moz-range-track {
+            height: 0.5rem;
+            width: 100%;
+            background-color: var(--background-slider);
+            border-radius: 1rem;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            position: relative;
+            height: 1.5rem;
+            width: 1.5rem;
+            border-style: none;
+            background-color: var(--background-slider);
+            border-radius: 1rem;
+            appearance: none;
+            -webkit-appearance: none;
+            top: 50%;
+            color: var(--box-shadow-slider);
+            transform: translateY(-50%);
+            box-shadow: 0 0 0 3px var(--box-shadow-slider) inset, 0 0 0 6px var(--background-slider) inset, 0 0 0 2rem var(--box-shadow-slider) inset, calc(100rem * -1 - 0.6rem) 0 0 100rem;
+        }
+        input[type="range"]::-moz-range-thumb {
+            position: relative;
+            height: 1.5rem;
+            width: 1.5rem;
+            border-style: none;
+            background-color: var(--background-slider);
+            border-radius: 1rem;
+            top: 50%;
+            color: var(--box-shadow-slider);
+            box-shadow: 0 0 0 3px var(--box-shadow-slider) inset, 0 0 0 6px var(--background-slider) inset, 0 0 0 2rem var(--box-shadow-slider) inset, calc(100rem * -1 - 0.5rem) 0 0 100rem;
+        }
+        
     </style>
 
     <body>
+        <!--<script src="index.js"></script>-->
         <script src="index.js"></script>
+        <script src="language.js"></script>
     </body>
 </html>

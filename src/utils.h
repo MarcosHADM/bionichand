@@ -102,10 +102,16 @@ static const char* wl_status_to_string(uint8_t status) {
 }
 
 
+typedef enum {
+    WIFI_CHECKING,
+    WIFI_SUCCESS,
+    WIFI_ERROR
+} wifi_check_status_t;
+
 struct WiFiCredentials {
     String ssid;
     String password;
-    String response;
+    wifi_check_status_t response;
 };
 
 #endif  // UTILS_H

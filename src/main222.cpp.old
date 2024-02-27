@@ -1,0 +1,274 @@
+/**
+ * @file    main.cpp
+ * @brief   This is the main file of the project.
+ * @details It contains the implementation of the main functionality.
+ * 
+ * @author  Marcos Helbert
+ * @date    July, 2023
+ * @version 1.0
+ *
+ * @section LICENSE
+ *
+ * This program is proprietary software; all rights are reserved to the
+ * author, Marcos Helbert. Unauthorized copying or distribution of this
+ * program, or any portion of it, is strictly prohibited.
+ *
+ * For more information about licensing, please contact the author at
+ * marcoshhelbert@gmail.com.
+ */
+#include <Arduino.h>
+#include "config.h"
+#include "utils.h"
+
+#include <Wire.h>
+#include <SPI.h>
+#include <Adafruit_PWMServoDriver.h>
+#include <AsyncTCP.h>
+#include <Logger.h>
+#include <ESPmDNS.h>
+#include <Preferences.h>
+#include <SPIFFS.h>
+#include <WiFi.h>
+#include <ArduinoJson.h>
+#include <AsyncJson.h>
+#include <ESPAsyncWebServer.h>
+
+Button resetButton(4);
+Preferences preferences;
+AsyncWebServer server{80};
+static WiFiCredentials checkConnectResult;
+
+void initMDSN() {
+    if(!MDNS.begin("handmotion")) {
+        Serial.println("Error starting mDNS");
+        return;
+    }
+}
+
+bool initWiFi() {
+    String ssid = preferences.getString("SSID", "");
+    String password = preferences.getString("Password", "");
+    WiFi.scanNetworks();
+    WiFi.disconnect();
+
+    if (ssid == "" && password == "") return false;
+
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid.c_str(), password.c_str());
+    uint8_t status = WiFi.waitForConnectResult(CONNECTION_TIMEOUT * 1000000);
+
+    if (status != WL_CONNECTED) return false;
+
+    return true;
+};
+
+bool WiFiScan(JsonVariant& jsonObj) {
+    int n = WiFi.scanComplete();
+    if (n == -2 || n == -1) {
+        WiFi.scanNetworks(true);
+        return false;
+    }
+
+    JsonArray jsonArray = jsonObj.createNestedArray("networks");
+    for (int i = 0; i < n; ++i) {
+        JsonObject innerJsonObj = jsonArray.createNestedObject();
+        innerJsonObj["ssid"] = WiFi.SSID(i);
+        innerJsonObj["channel"] = WiFi.channel(i);
+        innerJsonObj["quality"] = getRSSIasQuality(WiFi.RSSI(i));
+        innerJsonObj["rssi"] = WiFi.RSSI(i);
+        innerJsonObj["bssid"] = WiFi.BSSIDstr(i);
+        innerJsonObj["secure"] = WiFi.encryptionType(i);
+        if (WiFi.status() == WL_CONNECTED && WiFi.SSID() == WiFi.SSID(i)) innerJsonObj["connected"] = true;
+        else innerJsonObj["connected"] = false;
+    }
+
+    WiFi.scanDelete();
+    if(WiFi.scanComplete() == -2){
+        WiFi.scanNetworks(true);
+    }
+    return true;
+}
+
+static void notFound(AsyncWebServerRequest *request) {
+    request->send(404, "application/json", "{\"message\":\"Not found\"}");
+}
+
+static void NetworksScan(AsyncWebServerRequest *request) {
+    AsyncJsonResponse * response = new AsyncJsonResponse();
+    JsonVariant& jsonObj = response->getRoot();
+    
+    if (!WiFiScan(jsonObj)) {
+        request->send(200, "text/json", "[]");
+        return;
+    }
+
+    response->setLength();
+    request->send(response);
+};
+
+unsigned long startedTime;
+
+static void getLanguage(AsyncWebServerRequest *request) {
+    AsyncJsonResponse * response = new AsyncJsonResponse();
+    JsonVariant& jsonObj = response->getRoot();
+
+    jsonObj["Language"] = preferences.getString("Language", "en");
+
+    response->setLength();
+    request->send(response);
+};
+
+AsyncCallbackJsonWebHandler* wifiConnectHandle = new AsyncCallbackJsonWebHandler("/wifi/connect", [](AsyncWebServerRequest *request, JsonVariant &json) {
+    JsonObject jsonObj = json.as<JsonObject>();
+
+    if (jsonObj["ssid"].isNull() || jsonObj["ssid"].as<String>().length() < 1 || jsonObj["ssid"].as<String>().length() > 32) {
+        request->send(400, "text/plain", "Bad Request");
+        return;
+    }
+    if (jsonObj["isSecure"]) {
+        if (jsonObj["password"].isNull()
+        || jsonObj["password"].as<String>().length() > 64
+        || jsonObj["password"].as<String>().length() < 8) {
+            request->send(401, "text/plain", "WiFi Needs Password");
+            return;
+        }
+    }
+
+    LOG(Debug, "Connecting to %s", jsonObj["ssid"].as<String>().c_str());
+    WiFi.begin(jsonObj["ssid"].as<String>().c_str(), jsonObj["password"].as<String>().c_str());
+    WiFi.waitForConnectResult(CONNECTION_TIMEOUT * 1000000);
+
+    if (WiFi.status() == WL_CONNECTED) {
+        request->send(200, "text/plain", "OK");
+        LOG(Debug, "WiFi Connect Success");
+        return;
+    } else {
+        request->send(401, "text/plain", "WiFi Connect Failed");
+        LOG(Debug, "WiFi Connect Failed");
+        return;
+    }
+});
+
+AsyncCallbackJsonWebHandler* setupHandle = new AsyncCallbackJsonWebHandler("/setup", [](AsyncWebServerRequest *request, JsonVariant &json) {
+    JsonObject jsonObj = json.as<JsonObject>();
+
+    if (jsonObj["Language"].isNull() || jsonObj["Language"].as<String>().length() < 1) {
+        request->send(400, "text/plain", "Bad Request");
+        return;
+    }
+
+    LOG(Debug, "SETUP");
+
+    preferences.putString("Language", jsonObj["Language"].as<String>());
+    preferences.putString("Method", jsonObj["ConnectionMethod"].as<String>());
+    preferences.putString("SSID", jsonObj["SSID"].as<String>());
+    preferences.putString("Password", jsonObj["Password"].as<String>());
+    request->send(200, "text/plain", "OK");
+    preferences.putBool("FirstStart", false);
+
+    ESP.restart();
+});
+
+AsyncCallbackJsonWebHandler* servoHandle = new AsyncCallbackJsonWebHandler("/servo", [](AsyncWebServerRequest *request, JsonVariant &json) {
+    JsonObject jsonObj = json.as<JsonObject>();
+
+    LOG(Debug, "SERVO");
+    LOG(Debug, "Little Finger: %d", jsonObj["Little Finger"].as<bool>());
+    LOG(Debug, "Ring Finger: %d", jsonObj["Ring Finger"].as<bool>());
+    LOG(Debug, "Middle Finger: %d", jsonObj["Middle Finger"].as<bool>());
+    LOG(Debug, "Index Finger: %d", jsonObj["Index Finger"].as<bool>());
+    LOG(Debug, "Thumb: %d", jsonObj["Thumb"].as<bool>());
+    LOG(Debug, "Speed: %d", jsonObj["Speed"].as<int>());
+
+    request->send(200, "text/plain", "RECEIVED");
+});
+
+void reset() {
+    Serial.println("Inicial reset...");
+    ESP.restart();
+};
+
+void factoryReset() {
+    Serial.println("Inicial factory reset...");
+    preferences.clear();
+    delay(1000);
+    ESP.restart();
+};
+
+void setup() {
+    Serial.begin(115200);
+    LOG(Info, "Initializing...");
+
+    LOG(Debug, "Initializing Preferences...");
+    preferences.begin("handmotion", false);
+    LOG(Debug, "Preferences initialized.");
+
+    if(!SPIFFS.begin(true)){
+        LOG(Error, "An error has occurred while mounting SPIFFS");
+        return;
+    }
+
+    byte isFirstStart = preferences.getBool("FirstStart", true);
+    if (isFirstStart) LOG(Debug, "First start");
+    else LOG(Debug, "Not first start");
+    
+    if (initWiFi()) {
+        LOG(Debug, "WiFi initialized.");
+    } else {
+        LOG(Debug, "No saved networks.");
+
+        LOG(Debug, "Starting AP mode...");
+        WiFi.softAP("HANDMOTION-DEVICE", "handmotion");
+        IPAddress apIP(192, 168, 4, 1);
+        WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+        LOG(Debug, "AP mode started.");
+
+        LOG(Debug, "Initializing server...");
+        server.onNotFound(notFound);
+
+        server.on("/wifi/scan", HTTP_GET, NetworksScan);
+        server.addHandler(wifiConnectHandle);
+        if (isFirstStart) server.addHandler(setupHandle);
+
+        if (!isFirstStart) server.addHandler(servoHandle);
+
+        server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(SPIFFS, "/index.html", "text/html");});
+        server.on("/index.js", HTTP_GET, [isFirstStart](AsyncWebServerRequest *request) {
+            if (isFirstStart) request->send(SPIFFS, "/firststart.js", "text/javascript");
+            else request->send(SPIFFS, "/index.js", "text/javascript");
+        });
+
+        server.on("/get/language", HTTP_GET, getLanguage);
+
+        server.on("/jquery.min.js", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(SPIFFS, "/jquery.min.js", "text/javascript");});
+        server.on("/language.js", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(SPIFFS, "/language.js", "text/javascript");});
+        server.on("/languages.json", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(SPIFFS, "/languages.json", "text/json");});
+        server.on("/tailwind.config.js", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(SPIFFS, "/tailwind.config.js", "text/javascript");});
+        server.on("/tailwind.js", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(SPIFFS, "/tailwind.js", "text/javascript");});
+        server.on("/favicon.svg", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(SPIFFS, "/favicon.svg", "image/svg+xml");});
+
+        delay(1000);
+        server.begin();
+        LOG(Debug, "Server initialized.");
+
+        LOG(Debug, "Initializing mDNS...");
+        initMDSN();
+        LOG(Debug, "mDNS initialized.");
+
+        String IP;
+        if (WiFi.getMode() == WIFI_STA) {
+            IP = WiFi.localIP().toString();
+        } else {
+            IP = WiFi.softAPIP().toString();
+        }
+
+        LOG(Info, "You can now connect to http://handmotion.local or http://%s", IP.c_str());
+    }
+}
+
+void loop() {
+    switch (resetButton.read()) {
+        case ButtonStates::SHORT: reset(); break;
+        case ButtonStates::LONG: factoryReset(); break;
+    };
+}

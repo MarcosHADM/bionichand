@@ -64,4 +64,6 @@ class Logger {
         } formatter_;
 };
 
+extern Logger logger;
+
 #endif

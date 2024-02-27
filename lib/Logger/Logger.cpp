@@ -1,6 +1,8 @@
 //Logger.cpp
 #include "Logger.h"
 
+Logger logger(Debug, "{level} [{file}.{function}.{lineno}] {message}");
+
 Logger::Logger(LogLevel log_level, const char* format) : log_level_(log_level){
     formatter_.setFormat(format);
 };

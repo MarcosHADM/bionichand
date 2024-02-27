@@ -9,6 +9,7 @@
 #include "config.h"
 #include "utils.h"
 #include "Spiffs/Spiffs.h"
+#include "PreferencesMemory/PreferencesMemory.h"
 
 static WiFiCredentials checkConnectResult;
 
@@ -23,10 +24,10 @@ static void CheckConnectAsync(void* parameters) {
         Serial.println("WiFi status: " + get_wifi_status(WiFi.status()));
         if (WiFi.status() == WL_CONNECTED) {
             WiFi.disconnect();
-            checkConnectResult.response = "SUCCESS";
+            checkConnectResult.response = WIFI_SUCCESS;
         } else {
             WiFi.disconnect();
-            checkConnectResult.response = "ERROR";
+            checkConnectResult.response = WIFI_ERROR;
         }
     }
 
@@ -43,20 +44,71 @@ class WiFi_Class {
     public:
         WiFi_Class() {};
 
-        int foundNetwork(const char *ssid) {
-            int n = WiFi.scanComplete();
-            if (n != -2 && n) {
-                for (int i = 0; i < n; i++) {
-                    if (WiFi.SSID(i) == ssid) {
-                        return i;
-                        break;
-                    }
-                }
-            }
-            return -1;
+        bool begin() {
+            String ssid = PreferencesMemory.getString("SSID", "");
+            String password = PreferencesMemory.getString("Password", "");
+            WiFi.scanNetworks();
+            WiFi.disconnect();
+
+            if (ssid == "" && password == "") return false;
+
+            WiFi.mode(WIFI_STA);
+            WiFi.begin(ssid.c_str(), password.c_str());
+            uint8_t status = WiFi.waitForConnectResult(CONNECTION_TIMEOUT * 1000000);
+
+            if (status != WL_CONNECTED) return false;
+
+            return true;
+        };
+
+        void softAP(const char *ssid, const char *passphrase = (const char *)__null, int channel = 1, int ssid_hidden = 0, int max_connection = 4, bool ftm_responder = false) {
+            WiFi.softAP(ssid, passphrase, channel, ssid_hidden, max_connection, ftm_responder);
+            IPAddress apIP(192, 168, 4, 1);
+            WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
         }
 
-        void connect(const char *ssid, const char *passphrase = (const char *)__null, int32_t channel = 0, const uint8_t *bssid = (const uint8_t *)__null, bool connect = true) {
+        String getIP() {
+            if (WiFi.getMode() == WIFI_STA) return WiFi.localIP().toString();
+            else return WiFi.softAPIP().toString();
+        }
+
+        bool scan(JsonVariant& jsonObj) {
+            int n = WiFi.scanComplete();
+            if (n == -2 || n == -1) {
+                WiFi.scanNetworks(true);
+                return false;
+            }
+
+            JsonArray jsonArray = jsonObj.createNestedArray("networks");
+            for (int i = 0; i < n; ++i) {
+                JsonObject innerJsonObj = jsonArray.createNestedObject();
+                innerJsonObj["ssid"] = WiFi.SSID(i);
+                innerJsonObj["channel"] = WiFi.channel(i);
+                innerJsonObj["quality"] = getRSSIasQuality(WiFi.RSSI(i));
+                innerJsonObj["rssi"] = WiFi.RSSI(i);
+                innerJsonObj["bssid"] = WiFi.BSSIDstr(i);
+                innerJsonObj["secure"] = WiFi.encryptionType(i);
+                if (WiFi.status() == WL_CONNECTED && WiFi.SSID() == WiFi.SSID(i)) innerJsonObj["connected"] = true;
+                else innerJsonObj["connected"] = false;
+            }
+
+            WiFi.scanDelete();
+            if(WiFi.scanComplete() == -2){
+                WiFi.scanNetworks(true);
+            }
+            return true;
+        }
+
+        void checkConnect(String ssid, String password) {
+
+        };
+
+        wifi_check_status_t resultCheckConnect(String ssid, String password) {
+            if (checkConnectResult.ssid == ssid && checkConnectResult.password == password) return checkConnectResult.response;
+            return WIFI_ERROR;
+        };
+
+        /*void connect(const char *ssid, const char *passphrase = (const char *)__null, int32_t channel = 0, const uint8_t *bssid = (const uint8_t *)__null, bool connect = true) {
             WiFi.begin(ssid, passphrase, channel, bssid, connect);
         };
 
@@ -68,107 +120,21 @@ class WiFi_Class {
             return WiFi.status();
         };
 
-        bool resultCheckConnect(String ssid, String password) {
+        wifi_check_status_t resultCheckConnect(String ssid, String password) {
             if (checkConnectResult.ssid == ssid && checkConnectResult.password == password) {
-                if (checkConnectResult.response == "SUCCESS") {
-                    return true;
-                } else {
-                    return false;
-                }
+                return checkConnectResult.response;
             }
-            return false;
+            return WIFI_ERROR;
         };
         
         void checkConnect(String ssid, String password) {
             checkConnectResult.ssid = ssid;
             checkConnectResult.password = password;
-            checkConnectResult.response = "CHECKING";
+            checkConnectResult.response = WIFI_CHECKING;
             
             xTaskCreatePinnedToCore(CheckConnectAsync, "checkConnect", 4096, NULL, 1, NULL, 0);
         };
-
-        bool scan(JsonVariant& jsonObj) {
-            int n = WiFi.scanComplete();
-            if (n == -2) {
-                WiFi.scanNetworks(true);
-                return false;
-            }
-            else if (n == -1) {
-                WiFi.scanNetworks(true);
-                return false;
-            }
-            else {
-                JsonArray jsonArray = jsonObj.createNestedArray("networks");
-
-                for (int i = 0; i < n; ++i) {
-                    JsonObject innerJsonObj = jsonArray.createNestedObject();
-                    innerJsonObj["ssid"] = WiFi.SSID(i);
-                    innerJsonObj["channel"] = WiFi.channel(i);
-                    innerJsonObj["quality"] = getRSSIasQuality(WiFi.RSSI(i));
-                    innerJsonObj["rssi"] = WiFi.RSSI(i);
-                    innerJsonObj["bssid"] = WiFi.BSSIDstr(i);
-                    innerJsonObj["secure"] = WiFi.encryptionType(i);
-                    if (WiFi.status() == WL_CONNECTED && WiFi.SSID() == WiFi.SSID(i)) {
-                        innerJsonObj["connected"] = true;
-                    } else {
-                        innerJsonObj["connected"] = false;
-                    }
-                }
-                WiFi.scanDelete();
-                if(WiFi.scanComplete() == -2){
-                    WiFi.scanNetworks(true);
-                }
-                return true;
-            }
-        }
-
-        bool initWiFi() {
-            int numNetworks = Spiffs.getNumNetworks();
-            if (numNetworks == 0) {
-                Serial.println("No Wi-Fi networks configured");
-                return false;
-            }
-
-            WiFi.mode(WIFI_STA);
-            WiFi.disconnect();
-            WiFi.scanNetworks(true);
-            for (int i = 0; i < numNetworks; i++) {
-                WiFiConfig network = Spiffs.getNetwork(i);
-                int NetworkFound = foundNetwork(network.ssid);
-
-                if (NetworkFound != -1 && network.ssid != "") {
-                    if (WiFi.encryptionType(NetworkFound) != WIFI_AUTH_OPEN && network.password == "") {
-                        Serial.println("Network needs password: " + String(network.ssid));
-                        continue;
-                    }
-                    Serial.println("Network found: " + String(network.ssid));
-                    WiFi.begin(network.ssid, network.password);
-                    Serial.println("Connecting to WiFi...");
-
-                    unsigned long currentMillis = esp_timer_get_time()/1000000;
-                    previousMillis = currentMillis;
-
-                    while(WiFi.status() != WL_CONNECTED) {
-                        currentMillis = esp_timer_get_time()/1000000;
-                        if (currentMillis - previousMillis >= CONNECTION_TIMEOUT) {
-                            Serial.println("Failed to connect.");
-                            Serial.println("Trying to connect to the next network...");
-                            continue;
-                        }
-                    }
-
-                    Serial.println("Connected to the WiFi network");
-                    Serial.print("You can now connect to http://handmotion.local or http://");
-                    Serial.println(WiFi.localIP());
-                    return true;
-                } else {
-                    Serial.println("Wi-Fi network not found: " + String(network.ssid));
-                    continue;
-                }
-            }
-
-            return false;
-        }
+        */
 };
 
 extern WiFi_Class Wifi;

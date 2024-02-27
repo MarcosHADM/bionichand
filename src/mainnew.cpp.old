@@ -1,0 +1,97 @@
+/**
+ * @file    main.cpp
+ * @brief   This is the main file of the project.
+ * @details It contains the implementation of the main functionality.
+ * 
+ * @author  Marcos Helbert
+ * @date    July, 2023
+ * @version 1.0
+ *
+ * @section LICENSE
+ *
+ * This program is proprietary software; all rights are reserved to the
+ * author, Marcos Helbert. Unauthorized copying or distribution of this
+ * program, or any portion of it, is strictly prohibited.
+ *
+ * For more information about licensing, please contact the author at
+ * marcoshhelbert@gmail.com.
+ */
+
+#include <Arduino.h>
+#include "config.h"
+#include "utils.h"
+
+#include <Wire.h>
+#include <SPI.h>
+#include <Adafruit_PWMServoDriver.h>
+#include <AsyncTCP.h>
+#include <Logger.h>
+#include <ESPmDNS.h>
+
+#include "PreferencesMemory/PreferencesMemory.h"
+#include "Server/Server.h"
+#include "Spiffs/Spiffs.h"
+#include "Wifi/Wifi.h"
+
+
+Button resetButton(4);
+
+void initMDSN() {
+    if(!MDNS.begin("handmotion")) {
+        Serial.println("Error starting mDNS");
+        return;
+    }
+}
+void setup() {
+    Serial.begin(115200);
+    LOG(Info, "Initializing...");
+
+    LOG(Debug, "Initializing Preferences...");
+    PreferencesMemory.begin();
+    LOG(Debug, "Preferences initialized.");
+
+    if (!Spiffs.begin()) while (true) {;};
+    
+    byte isFirstStart = PreferencesMemory.getBool("FirstStart", true);
+    if (isFirstStart) LOG(Debug, "First start");
+    else LOG(Debug, "Not first start");
+
+    if (Wifi.begin()) {
+        LOG(Debug, "WiFi initialized.");
+    } else {
+        LOG(Debug, "No saved networks.");
+
+        LOG(Debug, "Starting AP mode...");
+        Wifi.softAP("HANDMOTION-DEVICE", "handmotion");
+        LOG(Debug, "AP mode started.");
+    }
+
+    LOG(Debug, "Initializing server...");
+    Server.begin(isFirstStart);
+    LOG(Debug, "Server initialized.");
+
+    LOG(Debug, "Initializing mDNS...");
+    initMDSN();
+    LOG(Debug, "mDNS initialized.");
+
+    LOG(Info, "You can now connect to http://handmotion.local or http://%s", Wifi.getIP().c_str());
+};
+
+void reset() {
+    Serial.println("Inicial reset...");
+    ESP.restart();
+};
+
+void factoryReset() {
+    Serial.println("Inicial factory reset...");
+    PreferencesMemory.clear();
+    delay(1000);
+    ESP.restart();
+};
+
+void loop() {
+    switch (resetButton.read()) {
+        case ButtonStates::SHORT: reset(); break;
+        case ButtonStates::LONG: factoryReset(); break;
+    };
+};

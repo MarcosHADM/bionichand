@@ -1,56 +1,37 @@
-/**
- * @file    main.cpp
- * @brief   This is the main file of the project.
- * @details It contains the implementation of the main functionality.
- * 
- * @author  Marcos Helbert
- * @date    July, 2023
- * @version 1.0
- *
- * @section LICENSE
- *
- * This program is proprietary software; all rights are reserved to the
- * author, Marcos Helbert. Unauthorized copying or distribution of this
- * program, or any portion of it, is strictly prohibited.
- *
- * For more information about licensing, please contact the author at
- * marcoshhelbert@gmail.com.
- */
-
 #include <Arduino.h>
-#include "config.h"
-#include "utils.h"
+#include <WiFiManager.h>
+#include <Logger.h>
 
 #include <Wire.h>
 #include <SPI.h>
 #include <Adafruit_PWMServoDriver.h>
-#include <AsyncTCP.h>
-#include <Logger.h>
+#include <Preferences.h>
 #include <ESPmDNS.h>
-#include <ansi.h>
-#include <EEPROM.h>
-#include "soc/rtc_wdt.h"
+#include <SPIFFS.h>
+#include <ArduinoJson.h>
+#include <AsyncJson.h>
+#include <ESPAsyncWebServer.h>
 
-#include "Wifi/Wifi.h"
-#include "spiffs/spiffs.h"
-#include "server/server.h"
+#include "config.h"
+#include "utils.h"
 
-#define EEPROM_SIZE 1
-#define FIRSTSTART_EEPROM_ADDR 0x00
+#define SERVOMIN  200 // this is the 'minimum' pulse length count (out of 4096)
+#define SERVOMAX  600 // this is the 'maximum' pulse length count (out of 4096)
 
-void rtc_wdt_protect_off();
-void rtc_wdt_disable_protect();
+Button resetButton(4);
+Preferences preferences;
+WiFiManager wifiManager;
+AsyncWebServer server{80};
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 
-
-
-Logger logger(Debug, "{level} [{file}.{function}.{lineno}] {message}");
-
-const char* ssid = "RESIDENCIA";
-const char* password = "mm251164";
-
-byte isFirstStart = 0x01;
-
-Button resetButton(0);
+struct {
+    bool littleFinger = false;
+    bool ringFinger = false;
+    bool middleFinger = false;
+    bool indexFinger = false;
+    bool thumb = false;
+    int speed = 1;
+} control;
 
 void initMDSN() {
     if(!MDNS.begin("handmotion")) {
@@ -58,68 +39,151 @@ void initMDSN() {
         return;
     }
 }
-void setup() {
-    Serial.begin(115200);
-    Spiffs.initSPIFFS();
-    
-    EEPROM.begin(EEPROM_SIZE);
-    isFirstStart = EEPROM.read(FIRSTSTART_EEPROM_ADDR);
-    if (isFirstStart == 0x01) {
-        Serial.println("First start");
-        EEPROM.write(FIRSTSTART_EEPROM_ADDR, 0x01);
-        EEPROM.commit();
-    } else {
-        Serial.println("Not first start");
-    }
 
-    if (Wifi.initWiFi()) {
-        initMDSN();
-    }
-    else {
-        Serial.println("Failed to connect to WiFi");
-        WiFi.softAP("HANDMOTION-DEVICE", "12345678");
-        Server.init(isFirstStart);
-        initMDSN();
-        Serial.print("You can now connect to http://handmotion.local or http://");
-        Serial.println(WiFi.softAPIP());
-    }
+static void notFound(AsyncWebServerRequest *request) {
+    request->send(404, "application/json", "{\"message\":\"Not found\"}");
+}
 
+static void getLanguage(AsyncWebServerRequest *request) {
+    AsyncJsonResponse * response = new AsyncJsonResponse();
+    JsonVariant& jsonObj = response->getRoot();
 
+    jsonObj["Language"] = preferences.getString("Language", "pt");
 
-    /*WiFi.mode(WIFI_AP_STA);
-    WiFi.disconnect();
-    WiFi.begin(ssid, password);
-    Serial.println("\nConnecting");
-
-    while(WiFi.status() != WL_CONNECTED){
-        Serial.print(".");
-        delay(1000);
-    }
-
-    Serial.println("\n");
-
-    Serial.print("You can now connect to http://handmotion.local or http://");
-    Serial.println(WiFi.localIP());
-
-    initServer();*/
+    response->setLength();
+    request->send(response);
 };
 
+static void getControl(AsyncWebServerRequest *request) {
+    AsyncJsonResponse * response = new AsyncJsonResponse();
+    JsonVariant& jsonObj = response->getRoot();
+
+    jsonObj["Little finger"] = control.littleFinger;
+    jsonObj["Ring finger"] = control.ringFinger;
+    jsonObj["Middle finger"] = control.middleFinger;
+    jsonObj["Index finger"] = control.indexFinger;
+    jsonObj["Thumb"] = control.thumb;
+    jsonObj["Speed"] = control.speed;
+
+    response->setLength();
+    request->send(response);
+};
+
+static void getStatistics(AsyncWebServerRequest *request) {
+    AsyncJsonResponse * response = new AsyncJsonResponse();
+    JsonVariant& jsonObj = response->getRoot();
+
+    jsonObj["SDK Version"] = ESP.getSdkVersion();
+    jsonObj["WiFi Mode"] = WiFi.getMode();
+    jsonObj["MAC Address"] = WiFi.macAddress();
+    jsonObj["Temperature"] = temperatureRead();
+    jsonObj["Uptime"] = esp_timer_get_time();
+    jsonObj["Free Heap"] = ESP.getFreeHeap();
+    jsonObj["Total Heap"] = ESP.getHeapSize();
+    jsonObj["Flash Size"] = ESP.getFlashChipSize();
+    jsonObj["Available Size"] = ESP.getFlashChipSize() - ESP.getSketchSize();
+
+    response->setLength();
+    request->send(response);
+}
+
+AsyncCallbackJsonWebHandler* servoHandle = new AsyncCallbackJsonWebHandler("/servo", [](AsyncWebServerRequest *request, JsonVariant &json) {
+    JsonObject jsonObj = json.as<JsonObject>();
+
+    LOG(Debug, "SERVO");
+
+    control.littleFinger = jsonObj["Little finger"].as<bool>();
+    control.ringFinger = jsonObj["Ring finger"].as<bool>();
+    control.middleFinger = jsonObj["Middle finger"].as<bool>();
+    control.indexFinger = jsonObj["Index finger"].as<bool>();
+    control.thumb = jsonObj["Thumb"].as<bool>();
+    control.speed = jsonObj["Speed"].as<int>();
+
+    request->send(200, "text/plain", "RECEIVED");
+});
+
+void setup() {
+    Serial.begin(115200);
+    LOG(Info, "Initializing...");
+
+    LOG(Debug, "Initializing Preferences...");
+    preferences.begin("handmotion");
+    LOG(Debug, "Preferences initialized.");
+
+    wifiManager.setHostname("handmotion");
+    if (!wifiManager.autoConnect("HANDMOTION-DEVICE", "handmotion")) {
+        LOG(Error, "Failed to connect to WiFi and hit timeout.");
+        delay(3000);
+        ESP.restart();
+    }
+
+    LOG(Debug, "WiFi connected.");
+
+    pwm.begin();
+    pwm.setPWMFreq(50);
+
+    if(!SPIFFS.begin(true)){
+        LOG(Error, "An error has occurred while mounting SPIFFS");
+        return;
+    }
+
+    server.onNotFound(notFound);
+    server.addHandler(servoHandle);
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(SPIFFS, "/index.html", "text/html");});
+    server.on("/index.js", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(SPIFFS, "/index.js", "text/javascript");});
+    server.on("/get/language", HTTP_GET, getLanguage);
+    server.on("/get/control", HTTP_GET, getControl);
+    server.on("/get/statistics", HTTP_GET, getStatistics);
+    server.on("/jquery.min.js", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(SPIFFS, "/jquery.min.js", "text/javascript");});
+    server.on("/language.js", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(SPIFFS, "/language.js", "text/javascript");});
+    server.on("/languages.json", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(SPIFFS, "/languages.json", "text/json");});
+    server.on("/tailwind.config.js", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(SPIFFS, "/tailwind.config.js", "text/javascript");});
+    server.on("/tailwind.js", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(SPIFFS, "/tailwind.js", "text/javascript");});
+    server.on("/favicon.svg", HTTP_GET, [](AsyncWebServerRequest *request) {request->send(SPIFFS, "/favicon.svg", "image/svg+xml");});
+
+    delay(1000);
+    server.begin();
+    LOG(Debug, "Server initialized.");
+
+    LOG(Debug, "Initializing mDNS...");
+    initMDSN();
+    LOG(Debug, "mDNS initialized.");
+
+    LOG(Info, "You can now connect to http://handmotion.local or http://%s", WiFi.localIP().toString().c_str());
+}
+
 void reset() {
-    Serial.println("Reset");
+    Serial.println("Inicial reset...");
+    ESP.restart();
 };
 
 void factoryReset() {
     Serial.println("Inicial factory reset...");
-    EEPROM.write(FIRSTSTART_EEPROM_ADDR, 0x01);
-    EEPROM.commit();
-    Spiffs.removeFile(WIFI_SSID_PATH);
+    preferences.clear();
+    wifiManager.resetSettings();
     delay(1000);
     ESP.restart();
 };
+
+int angle = 0;
+bool direction = true;
 
 void loop() {
     switch (resetButton.read()) {
         case ButtonStates::SHORT: reset(); break;
         case ButtonStates::LONG: factoryReset(); break;
-    };
-};
+    };   
+
+    pwm.setPWM(0, 0, control.thumb ? map(angle, 0, 120, SERVOMIN, SERVOMAX) : map(120, 0, 120, SERVOMIN, SERVOMAX));
+    pwm.setPWM(1, 0, control.indexFinger ? map(120 - angle, 0, 120, SERVOMIN, SERVOMAX) : map(0, 0, 120, SERVOMIN, SERVOMAX));
+    pwm.setPWM(2, 0, control.middleFinger ? map(angle, 0, 120, SERVOMIN, SERVOMAX) : map(120, 0, 120, SERVOMIN, SERVOMAX));
+    pwm.setPWM(3, 0, control.ringFinger ? map(120 - angle, 0, 120, SERVOMIN, SERVOMAX) : map(0, 0, 120, SERVOMIN, SERVOMAX));
+    pwm.setPWM(4, 0, control.littleFinger ? map(angle, 0, 120, SERVOMIN, SERVOMAX) : map(120, 0, 120, SERVOMIN, SERVOMAX));
+
+    if (angle == 120) direction = false;
+    if (angle == 1) direction = true;
+
+    if (direction) angle++;
+    else angle-- ;
+    delay(((-2 * control.speed + 12) * 1000) / 120);
+}
